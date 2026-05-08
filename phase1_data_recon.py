@@ -1,24 +1,30 @@
 """
-Phase 1 — data recon for the hackathon CSVs.
+Phase 1: Data Recon
 
-Loads train / test / sample_submission and prints shapes, columns, missing values,
-time ordering, target summaries, and expected submission layout. Run before modeling.
+Read the raw competition files and print the key checks before modeling:
+- file sizes
+- columns and possible features
+- missing values
+- train/test feature mismatch
+- date ordering
+- target summaries
+- submission format
+
+This script only reports. It does not clean or save data.
 """
 from pathlib import Path
 
 import pandas as pd
 
-# Absolute paths to competition files (adjust if you move the data).
+
 TRAIN_PATH = Path(r"D:/Documents/Hackathon/train.csv")
 TEST_PATH = Path(r"D:/Documents/Hackathon/test.csv")
 SAMPLE_SUBMISSION_PATH = Path(r"D:/Documents/Hackathon/sample_submission.csv")
 
-# Labels to predict; everything else in train.csv is treated as a feature.
 TARGET_COLUMNS = ["Target_Return", "Target_Direction"]
 
 
 def print_section(title: str) -> None:
-    """Visual separator in stdout so logs are easy to scan."""
     print("\n" + "=" * 80)
     print(title)
     print("=" * 80)
@@ -30,18 +36,28 @@ def load_csv(path: Path, name: str) -> pd.DataFrame:
     return pd.read_csv(path)
 
 
-def report_shape(df: pd.DataFrame, name: str) -> None:
-    print(f"{name}: {df.shape[0]:,} rows x {df.shape[1]:,} columns")
+def report_shapes(train: pd.DataFrame, test: pd.DataFrame, sample: pd.DataFrame) -> None:
+    print_section("File Sizes")
+    print(f"train.csv: {train.shape[0]:,} rows x {train.shape[1]:,} columns")
+    print(f"test.csv: {test.shape[0]:,} rows x {test.shape[1]:,} columns")
+    print(f"sample_submission.csv: {sample.shape[0]:,} rows x {sample.shape[1]:,} columns")
 
 
-def report_columns(df: pd.DataFrame, name: str) -> None:
-    print(f"\n{name} columns:")
-    for index, column in enumerate(df.columns, start=1):
+def report_columns(train: pd.DataFrame) -> None:
+    print_section("Columns")
+
+    print("All train columns:")
+    for index, column in enumerate(train.columns, start=1):
+        print(f"{index:>2}. {column}")
+
+    feature_columns = [column for column in train.columns if column not in TARGET_COLUMNS]
+
+    print("\nPossible feature columns:")
+    for index, column in enumerate(feature_columns, start=1):
         print(f"{index:>2}. {column}")
 
 
 def report_missing_values(df: pd.DataFrame, name: str) -> None:
-    # Only list columns with at least one NA to keep output short.
     missing = df.isna().sum()
     missing = missing[missing > 0]
 
@@ -52,54 +68,126 @@ def report_missing_values(df: pd.DataFrame, name: str) -> None:
         print(missing.to_string())
 
 
+def report_train_test_feature_match(train: pd.DataFrame, test: pd.DataFrame) -> None:
+    print_section("Train/Test Feature Match")
+
+    train_features = [column for column in train.columns if column not in TARGET_COLUMNS]
+    test_features = list(test.columns)
+
+    train_only = [column for column in train_features if column not in test_features]
+    test_only = [column for column in test_features if column not in train_features]
+
+    if not train_only and not test_only:
+        print("Train and test feature columns match.")
+        return
+
+    if train_only:
+        print("Columns in train but not test:")
+        for column in train_only:
+            print(f"- {column}")
+
+    if test_only:
+        print("\nColumns in test but not train:")
+        for column in test_only:
+            print(f"- {column}")
+
+    print("\nThese columns need a decision before modeling.")
+
+
+def clean_number_column(series: pd.Series) -> pd.Series:
+    cleaned = series.astype(str).str.replace(",", "", regex=False).str.strip()
+    cleaned = cleaned.replace({"": pd.NA, "nan": pd.NA, "None": pd.NA})
+    return pd.to_numeric(cleaned, errors="coerce")
+
+
+def report_id_order(train: pd.DataFrame, test: pd.DataFrame) -> None:
+    print_section("ID Order Check")
+
+    if "Id" not in train.columns or "Id" not in test.columns:
+        print("No Id column found in both train and test.")
+        return
+
+    train_ids = clean_number_column(train["Id"])
+    test_ids = clean_number_column(test["Id"])
+
+    print(f"Train missing IDs: {train_ids.isna().sum():,}")
+    print(f"Test missing IDs: {test_ids.isna().sum():,}")
+    print(f"Train duplicate IDs: {train_ids.duplicated().sum():,}")
+    print(f"Test duplicate IDs: {test_ids.duplicated().sum():,}")
+
+    valid_train_ids = train_ids.dropna()
+    valid_test_ids = test_ids.dropna()
+
+    if valid_train_ids.empty or valid_test_ids.empty:
+        print("Not enough valid IDs to check ordering.")
+        return
+
+    print(f"Train ID range: {int(valid_train_ids.min())} to {int(valid_train_ids.max())}")
+    print(f"Test ID range:  {int(valid_test_ids.min())} to {int(valid_test_ids.max())}")
+    print(f"Train IDs sorted: {valid_train_ids.is_monotonic_increasing}")
+    print(f"Test IDs sorted:  {valid_test_ids.is_monotonic_increasing}")
+    print(f"Test starts after train by ID: {valid_test_ids.min() > valid_train_ids.max()}")
+
+    print("\nIf Date looks messy, ID order is the safer time order for this practice dataset.")
+
+
+def parse_dates_safely(date_column: pd.Series, name: str) -> pd.Series:
+    dates = pd.to_datetime(date_column, format="mixed", errors="coerce")
+    invalid_dates = dates.isna()
+
+    if invalid_dates.any():
+        print(f"\n{name} invalid Date values: {invalid_dates.sum():,}")
+        print("Examples:")
+        print(date_column[invalid_dates].head(5).to_string(index=False))
+
+    return dates
+
+
 def report_time_series(train: pd.DataFrame, test: pd.DataFrame) -> None:
     print_section("Time-Series Check")
 
     if "Date" not in train.columns or "Date" not in test.columns:
-        print("No Date column found, so this does not look like obvious time-series data.")
+        print("No Date column found in both train and test.")
         return
 
-    train_dates = pd.to_datetime(train["Date"])
-    test_dates = pd.to_datetime(test["Date"])
+    train_dates = parse_dates_safely(train["Date"], "train.csv")
+    test_dates = parse_dates_safely(test["Date"], "test.csv")
 
-    print(f"Train date range: {train_dates.min().date()} to {train_dates.max().date()}")
-    print(f"Test date range:  {test_dates.min().date()} to {test_dates.max().date()}")
-    print(f"Train dates sorted: {train_dates.is_monotonic_increasing}")
-    print(f"Test dates sorted:  {test_dates.is_monotonic_increasing}")
-    # True usually means test is a future holdout — avoid shuffled CV if so.
-    print(f"Test starts after train ends: {test_dates.min() > train_dates.max()}")
+    valid_train_dates = train_dates.dropna()
+    valid_test_dates = test_dates.dropna()
 
-    print("\nConclusion: this is time-series data, so do not use a random train/test split.")
+    if valid_train_dates.empty or valid_test_dates.empty:
+        print("Not enough valid dates to check time ordering.")
+        return
+
+    print(f"Train date range: {valid_train_dates.min().date()} to {valid_train_dates.max().date()}")
+    print(f"Test date range:  {valid_test_dates.min().date()} to {valid_test_dates.max().date()}")
+    print(f"Train dates sorted: {valid_train_dates.is_monotonic_increasing}")
+    print(f"Test dates sorted:  {valid_test_dates.is_monotonic_increasing}")
+    print(f"Test starts after train ends: {valid_test_dates.min() > valid_train_dates.max()}")
+    print("\nReminder: this is time-series data, so do not randomly split rows.")
 
 
 def report_targets(train: pd.DataFrame) -> None:
     print_section("Target Check")
 
-    for target in TARGET_COLUMNS:
-        if target not in train.columns:
-            print(f"{target}: missing from train.csv")
-            continue
+    if "Target_Return" in train.columns:
+        print("Target_Return: regression target")
+        print(train["Target_Return"].describe()[["mean", "std", "min", "max"]].round(6).to_string())
+    else:
+        print("Target_Return is missing from train.csv")
 
-        unique_values = train[target].nunique()
-        dtype = train[target].dtype
-        print(f"{target}: dtype={dtype}, unique values={unique_values}")
-
-        if target == "Target_Return":
-            print("  Type: regression target because it is a continuous numeric value.")
-            print(
-                "  Summary:",
-                train[target].describe()[["mean", "std", "min", "max"]].round(6).to_dict(),
-            )
-
-        if target == "Target_Direction":
-            print("  Type: classification target because it is a 0/1 label.")
-            print("  Class balance:", train[target].value_counts().sort_index().to_dict())
+    if "Target_Direction" in train.columns:
+        print("\nTarget_Direction: classification target")
+        print(train["Target_Direction"].value_counts(dropna=False).sort_index().to_string())
+    else:
+        print("\nTarget_Direction is missing from train.csv")
 
 
 def report_submission_format(sample_submission: pd.DataFrame) -> None:
     print_section("Submission Format")
     print("Expected columns:", sample_submission.columns.tolist())
-    print(f"Expected submission rows: {len(sample_submission):,}")
+    print(f"Expected rows: {len(sample_submission):,}")
     print("\nFirst few rows:")
     print(sample_submission.head().to_string(index=False))
 
@@ -110,31 +198,22 @@ def main() -> None:
     sample_submission = load_csv(SAMPLE_SUBMISSION_PATH, "sample_submission.csv")
 
     print_section("Phase 1: Data Recon")
-    report_shape(train, "train.csv")
-    report_shape(test, "test.csv")
-    report_shape(sample_submission, "sample_submission.csv")
+    report_shapes(train, test, sample_submission)
+    report_columns(train)
 
-    # Features = all train columns except the two target fields.
-    print_section("Feature Names")
-    feature_columns = [column for column in train.columns if column not in TARGET_COLUMNS]
-    print("Feature columns used for prediction:")
-    for index, column in enumerate(feature_columns, start=1):
-        print(f"{index:>2}. {column}")
-
-    report_columns(train, "train.csv")
+    print_section("Missing Values")
     report_missing_values(train, "train.csv")
     report_missing_values(test, "test.csv")
+
+    report_train_test_feature_match(train, test)
+    report_id_order(train, test)
     report_time_series(train, test)
     report_targets(train)
     report_submission_format(sample_submission)
 
     print_section("Phase 1 Conclusion")
-    print("You now know:")
-    print("- how many rows and columns each file has")
-    print("- what features are available")
-    print("- whether missing values need immediate attention")
-    print("- that the data is chronological time-series data")
-    print("- that Target_Return is regression and Target_Direction is classification")
+    print("You now know what looks dirty or unusual before modeling.")
+    print("Next step: run Phase 1.5 to create cleaned files.")
 
 
 if __name__ == "__main__":
