@@ -16,9 +16,6 @@ PROJECT_ROOT = Path(__file__).resolve().parent
 SUBMISSION_PATH = PROJECT_ROOT / "submissions" / "xgboost_baseline_submission.csv"
 ANSWER_KEY_PATH = Path(r"D:/Documents/Hackathon/answer_key.csv")
 
-REPORT_DIR = PROJECT_ROOT / "reports" / "submission_score"
-SCORE_REPORT_PATH = REPORT_DIR / "score_report.csv"
-
 ID_COLUMN = "Id"
 TARGET_RETURN = "Target_Return"
 TARGET_DIRECTION = "Target_Direction"
@@ -117,12 +114,6 @@ def score_submission(submission: pd.DataFrame, answer_key: pd.DataFrame) -> dict
     }
 
 
-def save_score_report(metrics: dict[str, float]) -> None:
-    REPORT_DIR.mkdir(parents=True, exist_ok=True)
-    pd.DataFrame([metrics]).to_csv(SCORE_REPORT_PATH, index=False)
-    print(f"Saved: {SCORE_REPORT_PATH}")
-
-
 def main() -> None:
     print_section("Score Submission")
     print(f"Submission: {SUBMISSION_PATH}")
@@ -148,8 +139,6 @@ def main() -> None:
         "Submission direction matches return sign: "
         f"{metrics['submission_direction_matches_return_sign']:.4f}"
     )
-
-    save_score_report(metrics)
 
     print_section("Conclusion")
     print("Local scoring complete.")

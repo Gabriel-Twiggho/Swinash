@@ -26,7 +26,6 @@ TEST_PATH = PROJECT_ROOT / "data" / "processed" / "test_clean.csv"
 SAMPLE_SUBMISSION_PATH = PROJECT_ROOT / "data" / "processed" / "sample_submission_clean.csv"
 
 OUTPUT_DIR = PROJECT_ROOT / "data" / "modeling"
-REPORT_DIR = PROJECT_ROOT / "reports" / "phase2_5_prepare_features"
 
 TRAIN_FEATURES_PATH = OUTPUT_DIR / "train_features.csv"
 TEST_FEATURES_PATH = OUTPUT_DIR / "test_features.csv"
@@ -36,7 +35,6 @@ TRAIN_IDS_PATH = OUTPUT_DIR / "train_ids.csv"
 TEST_IDS_PATH = OUTPUT_DIR / "test_ids.csv"
 SAMPLE_SUBMISSION_PATH_OUT = OUTPUT_DIR / "sample_submission.csv"
 FEATURE_COLUMNS_PATH = OUTPUT_DIR / "feature_columns.csv"
-OUTLIER_CAPS_PATH = REPORT_DIR / "outlier_caps.csv"
 
 ID_COLUMN = "Id"
 DATE_COLUMN = "Date"
@@ -180,10 +178,8 @@ def save_feature_files(
     sample_submission: pd.DataFrame,
     train_features: pd.DataFrame,
     test_features: pd.DataFrame,
-    outlier_caps: pd.DataFrame,
 ) -> None:
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    REPORT_DIR.mkdir(parents=True, exist_ok=True)
 
     train_features.to_csv(TRAIN_FEATURES_PATH, index=False)
     test_features.to_csv(TEST_FEATURES_PATH, index=False)
@@ -195,8 +191,6 @@ def save_feature_files(
 
     feature_columns = pd.DataFrame({"feature": train_features.columns})
     feature_columns.to_csv(FEATURE_COLUMNS_PATH, index=False)
-
-    outlier_caps.to_csv(OUTLIER_CAPS_PATH, index=False)
 
 
 def report_outputs(
@@ -234,7 +228,6 @@ def report_outputs(
     print(f"Saved: {TEST_IDS_PATH}")
     print(f"Saved: {SAMPLE_SUBMISSION_PATH_OUT}")
     print(f"Saved: {FEATURE_COLUMNS_PATH}")
-    print(f"Saved: {OUTLIER_CAPS_PATH}")
 
 
 def main() -> None:
@@ -267,7 +260,6 @@ def main() -> None:
         sample_submission,
         train_features,
         test_features,
-        outlier_caps,
     )
 
     report_outputs(

@@ -32,11 +32,8 @@ TRAIN_TARGET_DIRECTION_PATH = MODELING_DIR / "train_target_direction.csv"
 TRAIN_IDS_PATH = MODELING_DIR / "train_ids.csv"
 SAMPLE_SUBMISSION_PATH = MODELING_DIR / "sample_submission.csv"
 
-REPORT_DIR = PROJECT_ROOT / "reports" / "phase3_xgboost_baseline"
 SUBMISSION_DIR = PROJECT_ROOT / "submissions"
 
-METRICS_PATH = REPORT_DIR / "validation_metrics.csv"
-FEATURE_IMPORTANCE_PATH = REPORT_DIR / "feature_importance.csv"
 SUBMISSION_PATH = SUBMISSION_DIR / "xgboost_baseline_submission.csv"
 
 TARGET_RETURN = "Target_Return"
@@ -126,15 +123,7 @@ def evaluate_validation(
     }
 
 
-def save_metrics(metrics: dict[str, float]) -> None:
-    REPORT_DIR.mkdir(parents=True, exist_ok=True)
-    pd.DataFrame([metrics]).to_csv(METRICS_PATH, index=False)
-    print(f"Saved: {METRICS_PATH}")
-
-
-def save_feature_importance(model: XGBRegressor, feature_names: list[str]) -> None:
-    REPORT_DIR.mkdir(parents=True, exist_ok=True)
-
+def print_feature_importance(model: XGBRegressor, feature_names: list[str]) -> None:
     importance = pd.DataFrame(
         {
             "feature": feature_names,
@@ -142,8 +131,10 @@ def save_feature_importance(model: XGBRegressor, feature_names: list[str]) -> No
         }
     )
     importance = importance.sort_values("importance", ascending=False)
-    importance.to_csv(FEATURE_IMPORTANCE_PATH, index=False)
-    print(f"Saved: {FEATURE_IMPORTANCE_PATH}")
+
+    print("\nTop feature importances:")
+    for row in importance.head(10).itertuples(index=False):
+        print(f"- {row.feature}: {row.importance:.4f}")
 
 
 def create_submission(
@@ -203,8 +194,7 @@ def main() -> None:
     print(f"MAE: {metrics['validation_mae']:.6f}")
     print(f"Direction accuracy: {metrics['validation_direction_accuracy']:.4f}")
 
-    save_metrics(metrics)
-    save_feature_importance(model, train_features.columns.tolist())
+    print_feature_importance(model, train_features.columns.tolist())
 
     print_section("Train Final Model")
     final_model = build_model()

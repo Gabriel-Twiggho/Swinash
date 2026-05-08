@@ -8,7 +8,7 @@ Get clues about the target, features, outliers, correlations, and mutual
 information before building the first model.
 
 This script does not train a model.
-It saves plots and summaries into reports/phase2_visual_eda/.
+It saves plots and summaries into visuals/phase2_visual_eda/.
 """
 from pathlib import Path
 
@@ -35,7 +35,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent
 TRAIN_PATH = PROJECT_ROOT / "data" / "processed" / "train_clean.csv"
 TEST_PATH = PROJECT_ROOT / "data" / "processed" / "test_clean.csv"
 
-OUTPUT_DIR = PROJECT_ROOT / "reports" / "phase2_visual_eda"
+OUTPUT_DIR = PROJECT_ROOT / "visuals" / "phase2_visual_eda"
 
 ID_COLUMN = "Id"
 DATE_COLUMN = "Date"
